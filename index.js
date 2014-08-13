@@ -1,7 +1,9 @@
 var request = require('request');
 var async = require('async');
+var printf = require('util').format;
 
 var default_cb = process.exit.bind(process);
+var branding_message = '*Created with issuetopr.*';
 
 module.exports = function (args, callback) {
     if (!args.user || args.user.length !== 40 || !args.user.match(/^[a-z0-9]+$/)) {
@@ -54,7 +56,7 @@ module.exports = function (args, callback) {
                 },
                 json: {
                     title: 'PR: ' + issue.title,
-                    body: 'Pull request for issue #' + args.issue + ' -- ' + issue.title,
+                    body: printf('Pull request for issue #%s -- %s\n\n%s', args.issue, issue.title, branding_message),
                     head: args.head,
                     base: args.base
                 }
