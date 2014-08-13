@@ -1,14 +1,19 @@
 var request = require('request');
 var async = require('async');
 
+var default_cb = process.exit.bind(process);
 
-module.exports = function (args) {
+module.exports = function (args, callback) {
     if (!args.user || args.user.length !== 40 || !args.user.match(/^[a-z0-9]+$/)) {
         console.warn('You must specify a user token in order for issuetopr to run.');
         console.warn('You can generate a token at https://github.com/settings/applications');
         console.warn('You can permanently store the token in ~/.issuetoprrc like so:');
         console.warn('    user=<my_personal_access_token>');
-        process.exit(1);
+        return (callback||default_cb)(1);
+    }
+    if (!args.issue) {
+        console.warn('You must specify an issue number.');
+        return (callback||default_cb)(1);
     }
     async.waterfall([
         function (next) {
@@ -29,7 +34,7 @@ module.exports = function (args) {
             request(issueQuery, function (err, res, issue) {
                 if (err) {
                     console.error(err);
-                    process.exit(1);
+                    return (callback||default_cb)(1);
                 }
                 if (args.debug && args.verbose) console.log('issue:', issue);
                 next(null, issue);
@@ -60,7 +65,7 @@ module.exports = function (args) {
             request(pullRequestConfig, function (err, res, PR) {
                 if (err || res.statusCode !== 201) {
                     console.error('API error:', err || PR);
-                    process.exit(1);
+                    return (callback||default_cb)(1);
                 }
                 console.log('pull request %d ("%s") created.\nURL: %s', PR.number, PR.title, PR.url);
                 next(null);
@@ -69,9 +74,9 @@ module.exports = function (args) {
     ], function (err, result) {
         if (err) {
             console.error(err);
-            process.exit(1);
+            return (callback||default_cb)(1);
         }
         if (args.debug) console.log('finished');
-        process.exit(0);
+        return (callback||default_cb)(0);
     });
 };
