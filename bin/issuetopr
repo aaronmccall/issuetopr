@@ -1,0 +1,91 @@
+#! /usr/bin/env node
+
+var async = require('async');
+var path = require('path');
+var parseArgs = require('minimist');
+var child = require('child_process');
+var utilities = require('../lib/utilities');
+
+var cwd = process.cwd();
+var pkg = require(path.join(cwd, 'package.json'));
+
+var defaults = {
+    base: 'CURRENT_BASE',
+    head: 'CURRENT_BRANCH',
+    repo: 'CURRENT_REPO',
+    issue: null,
+    debug: false,
+    verbose: false
+};
+
+var argv = parseArgs(process.argv.slice(2), {
+    'default': require('rc')('issuetopr', utilities.clone(defaults)),
+    'boolean': ['debug', 'verbose']
+});
+
+// if issue not passed as --issue=<issue_number>,
+// but there is a single numeric unnamed arg, use it.
+if (!argv.issue && argv._.length === 1 && typeof argv._[0] === 'number') {
+    argv.issue = argv._[0];
+}
+
+var series = [];
+if (argv.repo === defaults.repo) {
+    series.push(function (next) {
+        child.exec("git remote show origin | grep 'Push' | awk '{print $3}'", utilities.execHandler(function (repo, next) {
+            repo = utilities.extractRepoPath(repo);
+
+            if (repo) {
+                argv.repo = repo;
+                return next(null);
+            }
+            next('Could not determine repo name.\n' +
+                 'Please call issuetopr with --repo=<repo_name>.');
+        }, next));
+    });
+}
+
+if (argv.head === defaults.head) {
+    series.push(function (next) {
+        child.exec('git rev-parse --abbrev-ref HEAD', utilities.execHandler(function (head, next) {
+            if (head && head !== 'HEAD') {
+                argv.head = head.trim();
+                return next(null);
+            }
+            next('Not on a branch.\n' +
+                 'Please specify the head branch (--head=<branch_name>)\n' +
+                 'or checkout a branch before running issuetopr.');
+        }, next));
+    });
+}
+
+if (argv.base === defaults.base) {
+    series.push(function (next) {
+        var cmd = "git show-branch | grep '*' | grep -v \"" +
+                  argv.head +
+                  "\" | head -n1 | sed 's/.*\\[\\(.*\\)\\].*/\\1/' | sed 's/[\\^~].*//' ";
+
+        child.exec(cmd, utilities.execHandler(function (base, next) {
+            if (base) {
+                argv.base = base.trim();
+                return next(null);
+            }
+            next('Could not determine base branch for the pull request.\n' +
+                 'Please specify it with --base=<base_branch>.');
+        }, next));
+    });
+}
+
+async.series(series, function (err, results) {
+    if (err) {
+        console.error(err);
+        return process.exit(1);
+    }
+
+    if (argv.debug) console.log('args:', argv);
+    
+    var issuetopr = require('../');
+
+    issuetopr(argv);
+});
+
