@@ -1,6 +1,6 @@
 {
   "name": "issuetopr",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Make a pull request out of a git hub issue non-destructively",
   "main": "index.js",
   "scripts": {
