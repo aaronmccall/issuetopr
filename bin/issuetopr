@@ -1,66 +1,78 @@
 #! /usr/bin/env node
 
 var async = require('async');
+var child = require('child_process');
+var fs = require('fs');
 var path = require('path');
 var parseArgs = require('minimist');
-var child = require('child_process');
-var utilities = require('../lib/utilities');
+var prompt = require('prompt');
 
+var utilities = require('../lib/utilities');
 var cwd = process.cwd();
 var pkg = require(path.join(cwd, 'package.json'));
-
 var defaults = {
     base: 'CURRENT_BASE',
     head: 'CURRENT_BRANCH',
     repo: 'CURRENT_REPO',
     issue: null,
+    init: false,
     debug: false,
+    help: false,
     verbose: false
 };
 
 var argv = parseArgs(process.argv.slice(2), {
     'default': require('rc')('issuetopr', utilities.clone(defaults)),
-    'boolean': ['debug', 'verbose']
+    'boolean': ['debug', 'verbose', 'init', 'help']
 });
-
 // if issue not passed as --issue=<issue_number>,
 // but there is a single numeric unnamed arg, use it.
-if (!argv.issue && argv._.length === 1 && typeof argv._[0] === 'number') {
-    argv.issue = argv._[0];
+if (!argv.issue && argv._.length === 1) {
+    if (typeof argv._[0] === 'number') {
+        argv.issue = argv._[0];
+    }
+    if (argv._[0] === 'init') {
+        argv.init = true;
+    }
 }
 
-var series = [];
+if (argv.help || (!argv.issue && !argv.init)) {
+    utilities.help();
+    process.exit(1);
+}
+
+var series = {};
 if (argv.repo === defaults.repo) {
-    series.push(function (next) {
+    series.repo = function (next) {
         child.exec("git remote show origin | grep 'Push' | awk '{print $3}'", utilities.execHandler(function (repo, next) {
             repo = utilities.extractRepoPath(repo);
 
             if (repo) {
-                argv.repo = repo;
-                return next(null);
+                argv.repo = repo.trim();
+                return next(null, argv.repo);
             }
             next('Could not determine repo name.\n' +
                  'Please call issuetopr with --repo=<repo_name>.');
         }, next));
-    });
+    };
 }
 
 if (argv.head === defaults.head) {
-    series.push(function (next) {
+    series.head = function (next) {
         child.exec('git rev-parse --abbrev-ref HEAD', utilities.execHandler(function (head, next) {
             if (head && head !== 'HEAD') {
                 argv.head = head.trim();
-                return next(null);
+                return next(null, argv.head);
             }
             next('Not on a branch.\n' +
                  'Please specify the head branch (--head=<branch_name>)\n' +
                  'or checkout a branch before running issuetopr.');
         }, next));
-    });
+    };
 }
 
 if (argv.base === defaults.base) {
-    series.push(function (next) {
+    series.base = function (next) {
         var cmd = "git show-branch | grep '*' | grep -v \"" +
                   argv.head +
                   "\" | head -n1 | sed 's/.*\\[\\(.*\\)\\].*/\\1/' | sed 's/[\\^~].*//' ";
@@ -68,12 +80,12 @@ if (argv.base === defaults.base) {
         child.exec(cmd, utilities.execHandler(function (base, next) {
             if (base) {
                 argv.base = base.trim();
-                return next(null);
+                return next(null, argv.base);
             }
             next('Could not determine base branch for the pull request.\n' +
                  'Please specify it with --base=<base_branch>.');
         }, next));
-    });
+    };
 }
 
 async.series(series, function (err, results) {
@@ -81,11 +93,40 @@ async.series(series, function (err, results) {
         console.error(err);
         return process.exit(1);
     }
+    if (argv.init) {
+        var printf = require('util').format;
+        var repo = results.repo || argv.repo;
+        var base = results.base || argv.base;
+        prompt.message = prompt.delimiter = ''.white;
+        prompt.get([{
+            name: 'repo',
+            description: printf('repo (%s). Type a new one or enter to accept:'.white, repo)
+        }, {
+            name: 'base',
+            description: printf('base (%s). Type a new one or enter to accept:'.white, base)
+        }, {
+            name: 'confirm',
+            description: 'Enter "yes" to save or anything else to cancel:'.white,
+            message: 'Confirm'
+        }], function (err, results) {
 
-    if (argv.debug) console.log('args:', argv);
-    
-    var issuetopr = require('../');
-
-    issuetopr(argv);
+            if (results.confirm.toLowerCase() === 'yes') {
+                repo = results.repo || repo;
+                base = results.base || base;
+                console.log('\nSaving .issuetoprrc with the following values:\n');
+                console.log('\trepo=%s'.bold, repo);
+                console.log('\tbase=%s\n'.bold, base);
+                fs.writeFileSync(path.join(cwd, '.issuetoprrc'), printf('repo=%s\nbase=%s\n', repo, base));
+                process.exit(0);
+            } else {
+                console.log('\nCanceled!'.yellow);
+                process.exit(1);
+            }
+        });
+    } else {
+        if (argv.debug) console.log('args:', argv);
+        
+        require('../')(argv);
+    }
 });
 
