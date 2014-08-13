@@ -55,7 +55,7 @@ module.exports = function (args, callback) {
                     'User-Agent': 'request'
                 },
                 json: {
-                    title: 'PR: ' + issue.title,
+                    title: printf('PR: %s | Closes #%d', issue.title, args.issue),
                     body: printf('Pull request for issue #%s -- %s\n\n%s', args.issue, issue.title, branding_message),
                     head: args.head,
                     base: args.base
