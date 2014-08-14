@@ -1,5 +1,29 @@
 # issuetopr
 
+## tl;dr
+
+Get github personal access token from https://github.com/settings/applications, then:
+
+```bash
+# install
+npm i issuetopr -g
+
+# if global npm bin isn't in your path, then symlink into your path
+ln -s /usr/local/share/npm/bin/issuetopr <dir_in_your_path>/issuetopr
+
+# add personal access token to global config
+echo "user=<personal_access_token>" >> $HOME/.issuetoprrc
+
+# if not already in your current project's root directory
+cd /your/current/project
+
+# initialize per-project config
+issuetopr init
+
+# make a pull request from the current branch linked to issue#
+issuetopr <issue#>
+```
+
 ## What does it do?
 
 issuetopr allows a github user to create a pull request from the current branch that is explicitly linked to an issue.
@@ -28,7 +52,7 @@ If you don't have npm's bin directory in your path, please add it or symlink iss
 
 In order access the github API on your behalf, you must provide an access token.
 
-You can generate the token at https://github.com/settings/applications by clicking the 'Generat new token' button in the 'Personal access tokens' section.
+You can generate the token at https://github.com/settings/applications by clicking the 'Generate new token' button in the 'Personal access tokens' section.
 
 It is recommended that you store the token in your global config file by creating `$HOME/.issuetoprrc` with the following config:
 `user=<my_new_github_token>`
@@ -44,9 +68,7 @@ issuetopr is largely capable of self-configuring at run time, but at a performan
 In order to ensure best performance
 
 - add a `base=<my_global_default_merge_branch>` setting to your global config
-- add a `base=<my_project_default_merge_branch>`in any project's .issuetoprrc where you work from a different default merge branch.
-- add a `repo=<gh_username_or_orgname>/<my_repository_name>` to each project's .issuetoprrc
-
+- run `issuetopr init` in your projects' root dirs to create per-project configs
 
 You can configure issuetopr globally, per project, and at run time.
 
@@ -58,17 +80,14 @@ Create .issuetoprrc in your $HOME directory as mentioned above.
 
 This is most useful for setting the repo path and/or base branch defaults.
 
-Create `<my_project_dir>/.issuetoprrc` with the following values:
-```
-    repo=<gh_account>/<gh_repo>
-    base=<my_base_branch_name>
-```
+Create `<my_project_dir>/.issuetoprrc` by running `issuetopr init`:
 
 For example, for issuetopr itself:
 ```
     repo=aaronmccall/issuetopr
     base=master
 ```
+
 
 ### at run time
 

@@ -21,10 +21,20 @@ var defaults = {
     verbose: false
 };
 
-var argv = parseArgs(process.argv.slice(2), {
+var argParserConfig = {
     'default': require('rc')('issuetopr', utilities.clone(defaults)),
-    'boolean': ['debug', 'verbose', 'init', 'help']
-});
+    'boolean': ['debug', 'verbose', 'init', 'help'],
+    string: ['base', 'head', 'message', 'repo', 'user'],
+    alias: {
+        base: 'b',
+        head: 'h',
+        message: 'm',
+        repo: 'r',
+        user: 'u'
+    }
+};
+
+var argv = parseArgs(process.argv.slice(2), argParserConfig);
 // if issue not passed as --issue=<issue_number>,
 // but there is a single numeric unnamed arg, use it.
 if (!argv.issue && argv._.length === 1) {
@@ -37,7 +47,7 @@ if (!argv.issue && argv._.length === 1) {
 }
 
 if (argv.help || (!argv.issue && !argv.init)) {
-    utilities.help();
+    utilities.help(argParserConfig);
     process.exit(1);
 }
 
